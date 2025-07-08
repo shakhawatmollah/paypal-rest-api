@@ -10,6 +10,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Mono;
 
+import java.util.List;
 import java.util.Map;
 
 @Slf4j
@@ -34,6 +35,17 @@ public class PayPalWebhookController {
                         String eventJson = new ObjectMapper().writeValueAsString(webhookEvent);
 
                         dataService.saveWebhookEvent(eventType, eventJson);
+
+                        // Handle refund webhook
+                        if ("PAYMENT.CAPTURE.REFUNDED".equals(eventType)) {
+                            Map<String, Object> resource = (Map<String, Object>) webhookEvent.get("resource");
+                            String captureId = (String) resource.get("capture_id");
+                            if (captureId == null) {
+                                captureId = (String) resource.get("invoice_id");
+                            }
+                            dataService.saveRefund(resource, captureId);
+                            log.info("Refund captured via webhook: {}", resource.get("id"));
+                        }
 
                         log.info("Webhook event processed: {}", eventType);
                         return Mono.just(ResponseEntity.ok("Webhook processed"));

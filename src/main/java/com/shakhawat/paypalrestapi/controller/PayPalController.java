@@ -5,12 +5,10 @@ import com.shakhawat.paypalrestapi.service.PayPalDataService;
 import com.shakhawat.paypalrestapi.service.PayPalService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Mono;
 
-import java.io.Serializable;
 import java.util.List;
 import java.util.Map;
 
@@ -22,7 +20,6 @@ public class PayPalController {
 
     private final PayPalService payPalService;
     private final PayPalDataService dataService;
-    private final ObjectMapper objectMapper = new ObjectMapper();
 
     @PostMapping("/create-order")
     public Mono<ResponseEntity<Map<String, String>>> createOrder(@RequestBody Map<String, Object> orderPayload) {
@@ -110,5 +107,38 @@ public class PayPalController {
     public ResponseEntity<String> cancel() {
         return ResponseEntity.ok("Payment cancelled by user.");
     }
+
+    @PostMapping("/refund/{captureId}")
+    public Mono<ResponseEntity<Object>> refundCapture(
+            @PathVariable String captureId,
+            @RequestBody(required = false) Map<String, Object> body
+    ) {
+        Double amount;
+        String currency;
+
+        if (body != null && body.containsKey("amount")) {
+            Map<String, Object> amountObj = (Map<String, Object>) body.get("amount");
+            amount = Double.valueOf((String) amountObj.get("value"));
+            currency = (String) amountObj.get("currency_code");
+        } else {
+            currency = "";
+            amount = null;
+        }
+
+        return payPalService.getAccessToken()
+                .flatMap(token -> payPalService.refundCapture(token, captureId, amount, currency)
+                        .flatMap(refundResponse -> {
+                            if (refundResponse instanceof Map<?, ?>) {
+                                dataService.saveRefund((Map<String, Object>) refundResponse, captureId);
+                            }
+                            return Mono.just(ResponseEntity.ok(refundResponse));
+                        }))
+                .onErrorResume(e -> {
+                    log.error("Refund error", e);
+                    return Mono.just(ResponseEntity.status(500).body(Map.of("error", e.getMessage())));
+                });
+
+    }
+
 }
 

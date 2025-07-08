@@ -1,6 +1,7 @@
 package com.shakhawat.paypalrestapi.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.annotation.Nullable;
 import jakarta.annotation.PostConstruct;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
@@ -116,5 +117,29 @@ public class PayPalService {
 
         return payload;
     }
+
+    public Mono<Object> refundCapture(String accessToken, String captureId, @Nullable Double amount, @Nullable String currencyCode) {
+        Map<String, Object> payload = null;
+
+        if (amount != null && currencyCode != null) {
+            payload = Map.of(
+                    "amount", Map.of(
+                            "value", String.format("%.2f", amount),
+                            "currency_code", currencyCode
+                    )
+            );
+        }
+
+        WebClient.RequestBodySpec request = webClient.post()
+                .uri("/v2/payments/captures/" + captureId + "/refund")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE);
+
+        return (payload != null ? request.bodyValue(payload) : request)
+                .retrieve()
+                .bodyToMono(new ParameterizedTypeReference<>() {})
+                .doOnError(e -> log.error("Refund failed for captureId {}", captureId, e));
+    }
+
 
 }
