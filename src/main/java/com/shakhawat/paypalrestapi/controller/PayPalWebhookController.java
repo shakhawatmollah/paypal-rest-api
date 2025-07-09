@@ -10,7 +10,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Mono;
 
-import java.util.List;
 import java.util.Map;
 
 @Slf4j
@@ -33,12 +32,33 @@ public class PayPalWebhookController {
                     try {
                         String eventType = (String) webhookEvent.get("event_type");
                         String eventJson = new ObjectMapper().writeValueAsString(webhookEvent);
+                        Map<String, Object> resource = (Map<String, Object>) webhookEvent.get("resource");
 
                         dataService.saveWebhookEvent(eventType, eventJson);
 
+                        if ("CHECKOUT.ORDER.APPROVED".equalsIgnoreCase(eventType)) {
+                            String orderId = (String) resource.get("id");
+                            return payPalService.handleCheckoutApprovedWebhook(orderId, accessToken)
+                                    .map(ResponseEntity::ok)
+                                    .onErrorResume(e -> {
+                                        log.error("Auto-capture failed in webhook", e);
+                                        return Mono.just(ResponseEntity.status(500).body("Auto-capture failed"));
+                                    });
+                        }
+
+                        if ("PAYMENT.CAPTURE.COMPLETED".equalsIgnoreCase(eventType)) {
+                            String captureId = (String) resource.get("id");
+
+                            return payPalService.handlePaymentCaptureCompletedWebhook(resource)
+                                    .map(ResponseEntity::ok)
+                                    .onErrorResume(e -> {
+                                        log.error("Capture handling failed", e);
+                                        return Mono.just(ResponseEntity.status(500).body("Capture handling failed"));
+                                    });
+                        }
+
                         // Handle refund webhook
                         if ("PAYMENT.CAPTURE.REFUNDED".equals(eventType)) {
-                            Map<String, Object> resource = (Map<String, Object>) webhookEvent.get("resource");
                             String captureId = (String) resource.get("capture_id");
                             if (captureId == null) {
                                 captureId = (String) resource.get("invoice_id");

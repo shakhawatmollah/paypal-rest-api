@@ -143,4 +143,40 @@ public class PayPalDataService {
         }
     }
 
+    public void saveCapture(Map<String, Object> captureData) {
+        if (captureData == null || captureData.isEmpty()) {
+            log.warn("Empty or null capture data received");
+            return;
+        }
+
+        try {
+            String captureId = (String) captureData.get("id");
+            if (captureId == null) {
+                log.warn("Missing capture_id in captureData");
+                return;
+            }
+
+            Map<String, Object> amountObj = (Map<String, Object>) captureData.get("amount");
+
+            PayPalCapture capture = PayPalCapture.builder()
+                    .captureId(captureId)
+                    .orderId((String) captureData.get("invoice_id"))
+                    .status((String) captureData.get("status"))
+                    .amount(amountObj != null ? Double.valueOf((String) amountObj.get("value")) : null)
+                    .currency(amountObj != null ? (String) amountObj.get("currency_code") : null)
+                    .updateTime((String) captureData.get("update_time"))
+                    .build();
+
+            captureRepository.save(capture);
+
+            log.info("Saved capture [{}] successfully", captureId);
+        } catch (Exception e) {
+            log.error("Error while saving PayPal capture", e);
+        }
+    }
+
+    public boolean captureExists(String captureId) {
+        return captureRepository.existsById(captureId); // Assuming you have this method
+    }
+
 }

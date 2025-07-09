@@ -77,7 +77,11 @@ paypal:
   webhook-id: YOUR_WEBHOOK_ID
 ```
 ---
-Postman coll
+## ✅ Sample Final User Flow
+1. Client: /create-order → PayPal approve URL
+2. User approves → redirected to /return?orderId=XYZ
+3. Server: /capture-order/{orderId} → confirms + shows success
+4. Webhook (optional): handles fallback capture
 
 ---
 

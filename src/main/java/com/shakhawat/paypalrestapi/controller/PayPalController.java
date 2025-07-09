@@ -1,6 +1,5 @@
 package com.shakhawat.paypalrestapi.controller;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.shakhawat.paypalrestapi.service.PayPalDataService;
 import com.shakhawat.paypalrestapi.service.PayPalService;
 import lombok.RequiredArgsConstructor;
@@ -40,6 +39,7 @@ public class PayPalController {
                             // (Optional) save only basic info here, capture full detail after user returns
                             dataService.saveOrder(orderId, status, null, null); // or just skip
 
+                            assert approvalUrl != null;
                             return Mono.just(ResponseEntity.ok(Map.of("approvalUrl", approvalUrl)));
                         })
                 )
@@ -57,7 +57,7 @@ public class PayPalController {
                             try {
                                 // Navigate response structure
                                 List<Map<String, Object>> purchaseUnits = (List<Map<String, Object>>) captureResponse.get("purchase_units");
-                                Map<String, Object> purchaseUnit = purchaseUnits.get(0);
+                                Map<String, Object> purchaseUnit = purchaseUnits.getFirst();
 
                                 Map<String, Object> payments = (Map<String, Object>) purchaseUnit.get("payments");
                                 List<Map<String, Object>> captures = (List<Map<String, Object>>) payments.get("captures");
